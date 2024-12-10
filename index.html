@@ -90,7 +90,7 @@
             async function b(pin, name) {
                 let generatedUuid = x();
                 g && (document.cookie = `generated-uuid=${generatedUuid}`);
-                let reserveResponse = await fetch(`https://kahoot.it/reserve/session/${pin}/?${Date.now()}`, g ? void 0 : {
+                let reserveResponse = await fetch(`https://corsproxy.io/?url=https://kahoot.it/reserve/session/${pin}/?${Date.now()}`, g ? void 0 : {
                         headers: {
                             cookie: `generated-uuid=${generatedUuid}`
                         }
@@ -106,7 +106,7 @@
                 let offset = eval(offsetCode),
                     challengeResponse = challengeInput.split("").map((e, t) => String.fromCharCode((e.charCodeAt(0) * t + offset) % 77 + 48)).join(""),
                     xorResult = String.fromCharCode(...atob(sessionToken).split("").map((e, t) => e.charCodeAt(0) ^ challengeResponse.charCodeAt(t))),
-                    ws = new WebSocket(`wss://kahoot.it/cometd/${pin}/${xorResult}`, g ? void 0 : {
+                    ws = new WebSocket(`https://corsproxy.io/?url=wss://kahoot.it/cometd/${pin}/${xorResult}`, g ? void 0 : {
                         headers: {
                             cookie: `generated-uuid=${generatedUuid}`
                         }
