@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kahoot Bot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f4f4f4;
+        }
+        .container {
+            text-align: center;
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+        input, button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        p {
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Join Kahoot Game</h1>
+        <label for="gamePin">Game PIN:</label>
+        <input type="text" id="gamePin" placeholder="Enter Game PIN" />
+        <br />
+        <label for="botCount">How many bots to add?</label>
+        <input type="number" id="botCount" value="500" />
+        <br />
+        <button onclick="startBots()">Start Bots</button>
+        <p id="status"></p>
+    </div>
+
+    <script>
+        // The entire JavaScript code goes here
+        void "use strict";
+        (() => {
+            var l, w = new Uint8Array(16);
+
+            function k() {
+                if (!l && (l = typeof crypto < "u" && crypto.getRandomValues && crypto.getRandomValues.bind(crypto), !l)) throw new Error("crypto.getRandomValues() not supported. See https://github.com/uuidjs/uuid#getrandomvalues-not-supported");
+                return l(w)
+            }
+
+            function v(e, t = 0) {
+                return o[e[t + 0]] + o[e[t + 1]] + o[e[t + 2]] + o[e[t + 3]] + "-" + o[e[t + 4]] + o[e[t + 5]] + "-" + o[e[t + 6]] + o[e[t + 7]] + "-" + o[e[t + 8]] + o[e[t + 9]] + "-" + o[e[t + 10]] + o[e[t + 11]] + o[e[t + 12]] + o[e[t + 13]] + o[e[t + 14]] + o[e[t + 15]]
+            }
+            var o = [];
+            for (let e = 0; e < 256; ++e) o.push((e + 256).toString(16).slice(1));
+            var S = typeof crypto < "u" && crypto.randomUUID && crypto.randomUUID.bind(crypto),
+                f = {
+                    randomUUID: S
+                },
+                I = function (e, t, s) {
+                    if (f.randomUUID && !t && !e) return f.randomUUID();
+                    e = e || {};
+                    let r = e.random || (e.rng || k)();
+                    if (r[6] = r[6] & 15 | 64, r[8] = r[8] & 63 | 128, t) {
+                        s = s || 0;
+                        for (let i = 0; i < 16; ++i) t[s + i] = r[i];
+                        return t
+                    }
+                    return v(r)
+                },
+                x = I;
+            async function b(pin, name) {
+                let generatedUuid = x();
+                g && (document.cookie = `generated-uuid=${generatedUuid}`);
+                let reserveResponse = await fetch(`https://kahoot.it/reserve/session/${pin}/?${Date.now()}`, g ? void 0 : {
+                        headers: {
+                            cookie: `generated-uuid=${generatedUuid}`
+                        }
+                    }),
+                    sessionToken = reserveResponse.headers.get("x-kahoot-session-token"),
+                    { challenge } = await reserveResponse.json(),
+                    challengeInput = challenge.slice(19, 119),
+                    offsetCode = challenge.split("var offset = ")[1].split(";")[0].replace(/\s/g, "");
+                if (/[^\d()*+]/.test(offsetCode)) {
+                    console.warn("Kahoot just attempted to run the following code on your computer:", offsetCode, `Luckily, you were protected.`);
+                    return;
+                }
+                let offset = eval(offsetCode),
+                    challengeResponse = challengeInput.split("").map((e, t) => String.fromCharCode((e.charCodeAt(0) * t + offset) % 77 + 48)).join(""),
+                    xorResult = String.fromCharCode(...atob(sessionToken).split("").map((e, t) => e.charCodeAt(0) ^ challengeResponse.charCodeAt(t))),
+                    ws = new WebSocket(`wss://kahoot.it/cometd/${pin}/${xorResult}`, g ? void 0 : {
+                        headers: {
+                            cookie: `generated-uuid=${generatedUuid}`
+                        }
+                    });
+                ws.onopen = async () => {
+                    let e = 1,
+                        t = a => {
+                            e++, y && console.log("Sent", a), ws.send(JSON.stringify(a))
+                        };
+                    ws.addEventListener("message", a => {
+                        y && console.log("Received", JSON.parse(a.data))
+                    });
+                    let s = a => new Promise(p => {
+                        let c = n => {
+                            n = n;
+                            let d = JSON.parse(n.data);
+                            (!a || a(d)) && (p(d), ws.removeEventListener("message", c))
+                        };
+                        ws.addEventListener("message", c)
+                    });
+                    t([{
+                        id: e.toString(),
+                        version: "1.0",
+                        minimumVersion: "1.0",
+                        channel: "/meta/handshake",
+                        supportedConnectionTypes: ["websocket", "long-polling", "callback-polling"],
+                        advice: {
+                            timeout: 6e4,
+                            interval: 0
+                        },
+                        ext: {
+                            ack: !0,
+                            timesync: {
+                                tc: Date.now(),
+                                l: 0,
+                                o: 0
+                            }
+                        }
+                    }]);
+                    let r = await s(a => a?. [0]?.clientId),
+                        { clientId: i } = r[0];
+                    t([{
+                        id: e.toString(),
+                        channel: "/meta/connect",
+                        connectionType: "websocket",
+                        advice: {
+                            timeout: 0
+                        },
+                        clientId: i,
+                        ext: {
+                            ack: 0,
+                            timesync: {
+                                tc: Date.now(),
+                                l: 0,
+                                o: 0
+                            }
+                        }
+                    }]), ws.addEventListener("message", async a => {
+                        let p = a.data,
+                            c = JSON.parse(p);
+                        if (c?. [0]?.channel === "/meta/connect" && t([{
+                                id: e.toString(),
+                                channel: "/meta/connect",
+                                connectionType: "websocket",
+                                clientId: i,
+                                ext: {
+                                    ack: c[0].ext.ack
+                                }
+                            }]), c?. [0]?.channel === "/service/player" && c[0].data.id === 2) {
+                            await new Promise(d => setTimeout(d, Math.floor(Math.random() * 3e3)));
+                            let n = JSON.parse(c[0].data.content);
+                            n.type === "quiz" ? t([{
+                                id: e.toString(),
+                                channel: "/service/controller",
+                                data: {
+                                    gameid: pin,
+                                    type: "message",
+                                    host: "kahoot.it",
+                                    id: 45,
+                                    content: JSON.stringify({
+                                        type: "quiz",
+                                        choice: Math.floor(Math.random() * n.numberOfChoices),
+                                        questionIndex: n.gameBlockIndex
+                                    })
+                                },
+                                clientId: i,
+                                ext: {}
+                            }]) : n.type === "multiple_select_quiz" ? t([{
+                                id: e.toString(),
+                                channel: "/service/controller",
+                                data: {
+                                    gameid: pin,
+                                    type: "message",
+                                    host: "kahoot.it",
+                                    id: 45,
+                                    content: JSON.stringify({
+                                        type: "multiple_select_quiz",
+                                        choice: new Array(n.numberOfChoices).fill(0).map((d, m) => m).filter(() => Math.random() < .5),
+                                        questionIndex: n.gameBlockIndex
+                                    })
+                                },
+                                clientId: i,
+                                ext: {}
+                            }]) : n.type === "jumble" ? t([{
+                                id: e.toString(),
+                                channel: "/service/controller",
+                                data: {
+                                    gameid: pin,
+                                    type: "message",
+                                    host: "kahoot.it",
+                                    id: 45,
+                                    content: JSON.stringify({
+                                        type: "jumble",
+                                        choice: new Array(n.numberOfChoices).fill(0).map((d, m) => m).sort(() => Math.random() - .5),
+                                        questionIndex: n.gameBlockIndex
+                                    })
+                                },
+                                clientId: i,
+                                ext: {}
+                            }]) : n.type === "open_ended" ? t([{
+                                id: e.toString(),
+                                channel: "/service/controller",
+                                data: {
+                                    gameid: pin,
+                                    type: "message",
+                                    host: "kahoot.it",
+                                    id: 45,
+                                    content: JSON.stringify({
+                                        type: "open_ended",
+                                        text: "amogus",
+                                        questionIndex: n.gameBlockIndex
+                                    })
+                                },
+                                clientId: i,
+                                ext: {}
+                            }]) : n.type === "slider" && t([{
+                                id: e.toString(),
+                                channel: "/service/controller",
+                                data: {
+                                    gameid: pin,
+                                    type: "message",
+                                    host: "kahoot.it",
+                                    id: 45,
+                                    content: JSON.stringify({
+                                        type: "slider",
+                                        choice: Math.floor(Math.random() * (n.maxRange - n.minRange + 1) / n.step) * n.step + n.minRange,
+                                        questionIndex: n.gameBlockIndex
+                                    })
+                                },
+                                clientId: i,
+                                ext: {}
+                            }])
+                        }
+                    }), await s();
+                    let u = e.toString();
+                    t([{
+                        id: u,
+                        channel: "/service/controller",
+                        data: {
+                            type: "login",
+                            gameid: pin,
+                            host: "kahoot.it",
+                            name,
+                            content: JSON.stringify({
+                                device: {
+                                    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.3"
+                                },
+                                screen: {
+                                    width: 1920,
+                                    height: 1080
+                                }
+                            })
+                        },
+                        clientId: i,
+                        ext: {}
+                    }]), await s(a => a?. [0]?.id === u), t([{
+                        id: e.toString(),
+                        channel: "/service/controller",
+                        data: {
+                            gameid: pin,
+                            type: "message",
+                            host: "kahoot.it",
+                            id: 16,
+                            content: JSON.stringify({
+                                usingNamerator: !1
+                            })
+                        },
+                        clientId: i,
+                        ext: {}
+                    }])
+                }
+            }
+            async function C() {
+                for (let e = 0; e < h; e++) {
+                    let t = Math.floor(Math.random() * 1e6).toString();
+                    console.log("Joining as", t), await Promise.allSettled([b(J, t).then(() => console.log("Joined as", t)).catch(s => {
+                        console.error(s)
+                    }), new Promise(s => setTimeout(s, 66.66666666666667))])
+                }
+            }
+            var y = !1,
+                g = "window" in globalThis,
+                J = prompt("Game PIN:"),
+                h = parseInt(prompt("How many bots to add?"));
+            isNaN(h) && (h = 500, console.error("Invalid number (defaulting to 500)"));
+            C();
+        })();
+
+        function startBots() {
+            const gamePin = document.getElementById("gamePin").value;
+            const botCount = parseInt(document.getElementById("botCount").value) || 500;
+            document.getElementById("status").innerText = `Starting ${botCount} bots for Game PIN: ${gamePin}...`;
+            // Call the existing script with these values
+            // Example of invoking a bot start function with gamePin and botCount
+            C();
+        }
+    </script>
+</body>
+</html>
